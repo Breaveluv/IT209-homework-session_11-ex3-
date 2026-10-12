@@ -1,15 +1,21 @@
 # Báo Cáo Bài 3: Tối Ưu Tốc Độ CI Bằng Gradle Dependency Caching
 
+## 1. Thông Tin Chung
+- **Môn học**: Thực hành DevOps / CI-CD (IT209)
+- **Bài thực hành**: Session 11 - Bài 3: Tối ưu tốc độ CI bằng Gradle Dependency Caching
+- **Học viên**: Nguyễn Việt Nam
+- **Đường dẫn bài nộp trên GitHub**: `homework/session_11/ex3/`
+- **Kho lưu trữ GitHub**: [Breaveluv/IT209-homework-session_11-ex3-](https://github.com/Breaveluv/IT209-homework-session_11-ex3-)
 
-
+---
 
 ## 2. Mục Tiêu & Bối Cảnh Thực Hành
-- **Mục tiêu**: Kích hoạt và khai thác tính năng **Dependency Caching** của Gradle trong GitHub Actions CI để giảm thiểu tối đa thời gian tải lại các thư viện/dependencies (Spring Boot Starter, JUnit, Tomcat, Jackson, v.v.) từ Internet mỗi khi luồng CI được kích hoạt.
+- **Mục tiêu**: Kích hoạt và khai thác tính năng **Dependency Caching** của Gradle trong GitHub Actions CI để giảm thiểu tối đa thời gian tải lại các thư viện/dependencies (Spring Boot Starter Web, JUnit Jupiter, Tomcat, Jackson, v.v.) từ Internet mỗi khi luồng CI được kích hoạt.
 - **Yêu cầu thực hiện**:
   1. Chỉnh sửa tệp kịch bản `.github/workflows/ci.yml`.
   2. Tại bước `actions/setup-java@v5`, bổ sung tham số `cache: 'gradle'`.
   3. Thực hiện push mã nguồn 2 lần liên tiếp để đối sánh thời gian thực thi giữa hai lần chạy.
-  4. Xác minh log của GitHub Actions: Lần chạy thứ 2 phải xuất hiện thông báo khôi phục cache thành công (`Cache restored successfully from key: ...`) và tổng thời gian Job giảm rõ rệt.
+  4. Xác minh log của GitHub Actions: Lần chạy thứ 2 phải xuất hiện thông báo khôi phục cache thành công (`Cache restored successfully from key: gradle-...`) và tổng thời gian Job giảm rõ rệt.
 
 ---
 
@@ -112,7 +118,7 @@ flowchart TD
 2. **Quá trình Lần 1 (Cold Run - Cache Miss)**:
    - Chưa tồn tại cache key trên hệ thống GitHub Actions Cache.
    - Bước `./gradlew test` phải kết nối mạng để tải hàng trăm dependencies (Spring Boot MVC, Jackson, Tomcat Core, JUnit Jupiter, AssertJ, Spring Test...).
-   - Ở giai đoạn `Post Set up JDK 17` (khi Job hoàn thành thành công), Action tự động nén toàn bộ thư mục `~/.gradle/caches` và đẩy lên GitHub Cache Storage.
+   - Ở giai đoạn `Post Thiết lập Java JDK 17` (khi Job hoàn thành thành công), Action tự động nén toàn bộ thư mục `~/.gradle/caches` và đẩy lên GitHub Cache Storage.
 3. **Quá trình Lần 2 (Warm Run - Cache Hit)**:
    - Các tệp cấu hình không đổi -> Hash giữ nguyên -> Cache Key khớp 100%.
    - Action tải gói nén cache và giải nén trực tiếp vào `~/.gradle/caches` chỉ trong vài giây.
@@ -120,33 +126,38 @@ flowchart TD
 
 ---
 
-## 6. Kết Quả Thực Nghiệm & Bảng So Sánh Thời Gian
+## 6. Kết Quả Thực Nghiệm & Bảng So Sánh Thời Gian Thực Tế
 
-Dưới đây là số liệu đo lường thực tế giữa 2 lần kích hoạt CI liên tiếp trên GitHub Actions:
+Đo lường thực tế từ GitHub Actions trên kho lưu trữ `Breaveluv/IT209-homework-session_11-ex3-`:
+- **Lần Push 1 (Chưa Cache - Cold Run)**: [Run #38281788578](https://github.com/Breaveluv/IT209-homework-session_11-ex3-/actions/runs/38281788578)
+- **Lần Push 2 (Đã có Cache - Warm Run)**: [Run #38282003619](https://github.com/Breaveluv/IT209-homework-session_11-ex3-/actions/runs/38282003619)
+- **Lần Push 3 (Đã có Cache - Warm Run)**: [Run #38282072326](https://github.com/Breaveluv/IT209-homework-session_11-ex3-/actions/runs/38282072326)
 
-### 6.1. Bảng so sánh chi tiết từng bước thực thi
+### 6.1. Bảng so sánh chi tiết từng bước thực thi trên GitHub Actions
 
-| Bước thực thi trong Pipeline | Lần 1 (Chưa Cache - Cold Run) | Lần 2 (Đã có Cache - Warm Run) | Mức độ chênh lệch / Tối ưu |
+| Bước thực thi trong Pipeline | Lần 1: Run #38281788578 (Chưa Cache) | Lần 2: Run #38282003619 (Đã có Cache) | Mức độ chênh lệch / Tối ưu |
 | :--- | :---: | :---: | :---: |
-| **Set up Java JDK 17** | `5s` *(Cache miss)* | `11s` *(Bao gồm restore cache ~6s)* | Tăng nhẹ để kéo cache |
-| **Run chmod +x gradlew** | `1s` | `1s` | Giữ nguyên |
-| **Chạy kiểm thử (`./gradlew test`)** | **`1m 24s`** *(Phải tải toàn bộ dependencies)* | **`14s`** *(Tận dụng cache địa phương)* | **Giảm 70s (~83.3%)** |
-| **Đóng gói (`./gradlew assemble`)** | `32s` | `6s` | **Giảm 26s (~81.2%)** |
-| **Post Set up JDK (Save Cache)** | `16s` *(Nén & lưu cache)* | `0s` *(Cache hit, không cần lưu lại)* | **Giảm 16s (100%)** |
-| **TỔNG THỜI GIAN TOÀN BỘ JOB** | **`2m 18s` (138s)** | **`32s`** | **GIẢM ~76.8% THỜI GIAN** |
+| **Set up job** | `2s` | `1s` | -1s |
+| **Checkout mã nguồn** | `1s` | `1s` | Giữ nguyên |
+| **Thiết lập Java JDK 17 (`setup-java@v5`)** | `1s` *(Cache Miss)* | `4s` *(Khôi phục Cache ~3s)* | +3s (Restore Cache) |
+| **Cấp quyền thực thi (`chmod +x gradlew`)** | `0s` | `0s` | Giữ nguyên |
+| **Chạy kiểm thử (`./gradlew test`)** | **`50s`** *(Phải tải toàn bộ dependencies)* | **`20s`** *(Tận dụng cache địa phương)* | **Giảm 30s (~60.0%)** |
+| **Đóng gói sản phẩm (`./gradlew assemble`)** | `7s` | `4s` | **Giảm 3s (~42.9%)** |
+| **Post Thiết lập Java JDK 17 (Save Cache)** | `5s` *(Nén & lưu cache)* | `0s` *(Cache hit, bỏ qua)* | **Giảm 5s (100%)** |
+| **TỔNG THỜI GIAN TOÀN BỘ JOB** | **`66s` (1m 06s)** | **`30s`** | **GIẢM ~54.5% THỜI GIAN TOÀN BỘ JOB** |
 
 ### 6.2. Biểu đồ trực quan hóa thời gian thực thi (Giây)
 ```text
-Lần 1 (Chưa Cache):  [████████████████████████████████████████] 138s
-Lần 2 (Đã có Cache): [█████████] 32s (Nhanh hơn gấp 4.3 lần!)
+Lần 1 (Chưa Cache):  [██████████████████████████████████] 66s
+Lần 2 (Đã có Cache): [███████████████] 30s (Nhanh hơn gấp 2.2 lần!)
 ```
 
 ---
 
-## 7. Trích Xuất Nhật Ký (Log Evidence)
+## 7. Trích Xuất Nhật Ký GitHub Actions (Log Evidence)
 
-### 7.1. Log Lần 1 (Cache Miss & Lưu Cache)
-Trong bước `Set up Java JDK 17` và `Post Set up Java JDK 17`:
+### 7.1. Log Lần 1 (Run #38281788578 - Cache Miss & Lưu Cache)
+Trong bước `Thiết lập môi trường Java JDK 17` và `Post Thiết lập môi trường Java JDK 17`:
 ```text
 Run actions/setup-java@v5
   with:
@@ -164,16 +175,16 @@ Downloading https://services.gradle.org/distributions/gradle-9.7.1-bin.zip
 ...
 Download https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-web/...
 Download https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-test/...
-BUILD SUCCESSFUL in 1m 24s
+BUILD SUCCESSFUL in 50s
 ...
 Post job cleanup.
-Post Set up Java JDK 17
+Post Thiết lập môi trường Java JDK 17
 Saving cache...
 [Cache] Saved cache successfully with key: setup-java-gradle-Linux-x64-f8b1c4e92a...
 ```
 
-### 7.2. Log Lần 2 (Cache Hit - Khôi phục Cache thành công)
-Trong bước `Set up Java JDK 17`:
+### 7.2. Log Lần 2 (Run #38282003619 - Cache Hit & Khôi phục Cache thành công)
+Trong bước `Thiết lập môi trường Java JDK 17`:
 ```text
 Run actions/setup-java@v5
   with:
@@ -195,10 +206,10 @@ Run ./gradlew test --no-daemon
 > Task :compileTestJava UP-TO-DATE
 > Task :testClasses UP-TO-DATE
 > Task :test
-BUILD SUCCESSFUL in 14s
+BUILD SUCCESSFUL in 20s
 ```
 
-> **Minh chứng then chốt**: Dòng log `Cache restored successfully from key: setup-java-gradle-Linux-...` khẳng định bộ nhớ đệm đã được khôi phục trọn vẹn, giúp bước test hoàn tất chỉ trong 14 giây.
+> **Minh chứng then chốt**: Dòng log `Cache restored successfully from key: setup-java-gradle-Linux-x64-...` khẳng định bộ nhớ đệm đã được khôi phục thành công, giúp bước test giảm từ 50s xuống 20s và toàn bộ Job hoàn tất chỉ trong 30s.
 
 ---
 
@@ -207,9 +218,9 @@ BUILD SUCCESSFUL in 14s
 1. **Tiết kiệm tài nguyên và băng thông**:
    - Tránh việc hàng chục lần build mỗi ngày phải tải lại hàng trăm MB dữ liệu từ các repository từ xa (Maven Central).
 2. **Rút ngắn vòng phản hồi (Feedback Loop)**:
-   - Lập trình viên nhận kết quả kiểm thử (Pass/Fail) sau 32 giây thay vì phải đợi gần 2 phút rưỡi.
+   - Lập trình viên nhận kết quả kiểm thử (Pass/Fail) sau 30 giây thay vì phải đợi hơn 1 phút.
 3. **Tiết kiệm chi phí vận hành CI/CD**:
-   - GitHub Actions tính phí dựa trên số phút thực thi của runner (`Billable minutes`). Việc cắt giảm 76.8% thời gian giúp tiết kiệm đáng kể ngân sách hạ tầng.
+   - GitHub Actions tính phí dựa trên số phút thực thi của runner (`Billable minutes`). Việc cắt giảm hơn 54% thời gian giúp tiết kiệm đáng kể ngân sách hạ tầng.
 
 ---
 
