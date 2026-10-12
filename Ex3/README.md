@@ -1,13 +1,6 @@
 # Báo Cáo Bài 3: Tối Ưu Tốc Độ CI Bằng Gradle Dependency Caching
 
-## 1. Thông Tin Chung
-- **Môn học**: Thực hành DevOps / CI-CD (IT209)
-- **Bài thực hành**: Session 11 - Bài 3: Tối ưu tốc độ CI bằng Gradle Dependency Caching
-- **Học viên**: Nguyễn Việt Nam
-- **Đường dẫn bài nộp**: `homework/session_11/ex3/`
-- **Kho lưu trữ GitHub**: [Breaveluv/IT209-homework-session_11-ex3-](https://github.com/Breaveluv/IT209-homework-session_11-ex3-)
 
----
 
 ## 2. Mục Tiêu & Bối Cảnh Thực Hành
 - **Mục tiêu**: Kích hoạt và khai thác tính năng **Dependency Caching** của Gradle trong GitHub Actions CI để giảm thiểu tối đa thời gian tải lại các thư viện/dependencies (Spring Boot Starter, JUnit, Tomcat, Jackson, v.v.) từ Internet mỗi khi luồng CI được kích hoạt.
